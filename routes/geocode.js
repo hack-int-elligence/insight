@@ -17,7 +17,7 @@ router.get('/', function(req, res) {
 	res.render('index');
 });
 
-router.get('/fb_events', function(req, res) {
+router.post('/fb_events', function(req, res) {
 	var FB = require('fb');
 	FB.setAccessToken(req.body.authToken);
 	FB.api('me/events', function(events) {
