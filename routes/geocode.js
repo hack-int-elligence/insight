@@ -35,34 +35,38 @@ router.post('/insight', function(req, res) {
 			var resultCount = THRESHOLD;
 
 			console.log('found ' + response.results.length + ' results');
-			console.log('Extracing information for the top: ' + THRESHOLD)
-			
-			for (var i = 0; i < THRESHOLD; i++) {
-				// using the reference field, make individual PlaceDetails requests via the Places API
-				googleplaces.placeDetailsRequest({
-					reference: response.results[i].reference
-				}, function(detailsErr, details) {
-					// must have lat/long geometry for insight
-					if (details.result.geometry) {
-						// push only relevent API response information
-						placeDetails.push({
-							name: details.result.name,
-							location: details.result.geometry.location,
-							icon: details.result.icon,
-							place_id: details.result.place_id,
-							address: details.result.formatted_address,
-							website: details.result.website
-						});
-						// IMPORTANT: do not modify
-						// async check counter (only sends response when all meta-inf has been retrieved)
-						if (placeDetails.length == resultCount) {
-							res.send(placeDetails);
+			console.log('Extracting information for the top: ' + THRESHOLD)
+
+			if (response.results.length > 0) {
+				for (var i = 0; i < THRESHOLD; i++) {
+					// using the reference field, make individual PlaceDetails requests via the Places API
+					googleplaces.placeDetailsRequest({
+						reference: response.results[i].reference
+					}, function(detailsErr, details) {
+						// must have lat/long geometry for insight
+						if (details.result.geometry) {
+							// push only relevent API response information
+							placeDetails.push({
+								name: details.result.name,
+								location: details.result.geometry.location,
+								icon: details.result.icon,
+								place_id: details.result.place_id,
+								address: details.result.formatted_address,
+								website: details.result.website
+							});
+							// IMPORTANT: do not modify
+							// async check counter (only sends response when all meta-inf has been retrieved)
+							if (placeDetails.length == resultCount) {
+								res.send(placeDetails);
+							}
+						} else {
+							// decrement check counter if result does not have geometry
+							resultCount -= 1;
 						}
-					} else {
-						// decrement check counter if result does not have geometry
-						resultCount -= 1;
-					}
-				});
+					});
+				}
+			} else {
+				res.send([]);
 			}
 		}
 	});
