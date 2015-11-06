@@ -20,9 +20,11 @@ router.post('/insight', function(req, res) {
 	var googleplaces = require('googleplaces')(g_API_key[g_API_key_offset], 'json');
 
 	// start a RadarSearch via the Google Places API
+	// use default radius as 500m
+	// default seach category is 'restaurants'
 	googleplaces.radarSearch({
 		location: [Number(req.body.latitude), Number(req.body.longitude)],
-		radius: '500',
+		radius: req.body.radius || '500',
 		types: ['restaurant']
 	}, function(error, response) {
 		if (error) {
