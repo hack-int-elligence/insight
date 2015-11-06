@@ -28,7 +28,7 @@ router.get('/fb_events', function(req, res) {
 		var acceptedEvents = [];
 		for (var i = 0; i < events.data.length; i++) {
 			var event = events.data[i];
-			if (event.place.location.latitude && event.place.location.longitude) {
+			if (event.place.location && event.place.location.latitude && event.place.location.longitude) {
 				// check to see it has geocodable data
 				// build epoch moment
 				var event_time = moment.unix(event.start_time);
