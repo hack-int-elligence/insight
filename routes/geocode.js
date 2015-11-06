@@ -25,7 +25,7 @@ router.get('/fb_events', function(req, res) {
 			console.log(!events ? 'error occurred' : events.error);
 			res.send(events.error);
 		}
-		console.log(events);
+		res.send(events);
 	});
 });
 
