@@ -19,8 +19,8 @@ router.get('/', function(req, res) {
 
 router.get('/fb_events', function(req, res) {
 	var FB = require('fb');
-	FB.setAccessToken('CAAJlnCaKfaEBAFko2yc6QQX8W90tzPF5xtO4pZCmJeLRXWhM0ZAqlLsB7Cqyllhjlqj09ZB0GT588jJdmGTu3oKmwu8RBD05vaPvjQRflQYlcIe0gNQSdBog7znxqylAweFYbdWIhHztx6t9ZCVqCCnIzSZAyZBGCbanPuIWpZAOT3hR1XV6zllt6b2KEnfWgZAYEg3MaFFyQWvpwXgS1fooX0L1TFSshmV59BOF7o9wagZDZD' || req.body.authToken);
-	FB.api('me/events?date_format=U', function(events) {
+	FB.setAccessToken(req.body.authToken);
+	FB.api('me/events', function(events) {
 		if (!events || events.error) {
 			console.log(!events ? 'error occurred' : events.error);
 			res.send(events.error);
@@ -29,9 +29,9 @@ router.get('/fb_events', function(req, res) {
 		for (var i = 0; i < events.data.length; i++) {
 			var event = events.data[i];
 			if (event.place.location && event.place.location.latitude && event.place.location.longitude) {
-				// check to see it has geocodable data
-				// build epoch moment
+				// check to see it has geocodable data & build epoch stamp
 				var event_time = moment(event.start_time);
+				// should be >= current time on the same day
 				if (event_time.isAfter() && event_time.isSame(new Date(), 'day')) {
 					acceptedEvents.push(event);
 				}
