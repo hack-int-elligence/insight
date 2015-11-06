@@ -51,7 +51,7 @@ router.post('/insight', function(req, res) {
 	googleplaces.radarSearch({
 		location: [Number(req.body.latitude), Number(req.body.longitude)],
 		radius: req.body.radius || '500',
-		types: ['restaurant']
+		types: req.body.categories || ['restaurant']
 	}, function(error, response) {
 		if (error) {
 			// if there's an error, send back the error
