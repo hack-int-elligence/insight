@@ -19,7 +19,7 @@ router.get('/', function(req, res) {
 
 router.get('/fb_events', function(req, res) {
 	var FB = require('fb');
-	FB.setAccessToken('CAAJlnCaKfaEBAGqSUnt7uXlTBMx8PHwfBzHsnv8zStSXAj7Q8mVAa1ZC11wARDZBka3446X4GdQGSyc10C43cqGCDT5lYqOrfBy8huDd4PeENYQDiXTIdW0okPtYqHpoUZBaOo75oNWZAB9Kp3aaKBn7QVhtdl4SLTDdLsM2DOtcdyA6hfPcSrXo2tgGzOO4TfGOYWmQHJFGwYc9eqfwnwwyWdD3s0TMpgmT6ZAsOOQZDZD' || req.body.authToken);
+	FB.setAccessToken('CAAJlnCaKfaEBAFko2yc6QQX8W90tzPF5xtO4pZCmJeLRXWhM0ZAqlLsB7Cqyllhjlqj09ZB0GT588jJdmGTu3oKmwu8RBD05vaPvjQRflQYlcIe0gNQSdBog7znxqylAweFYbdWIhHztx6t9ZCVqCCnIzSZAyZBGCbanPuIWpZAOT3hR1XV6zllt6b2KEnfWgZAYEg3MaFFyQWvpwXgS1fooX0L1TFSshmV59BOF7o9wagZDZD' || req.body.authToken);
 	FB.api('me/events', function(events) {
 		if (!events || events.error) {
 			console.log(!events ? 'error occurred' : events.error);
