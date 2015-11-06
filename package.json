@@ -19,6 +19,7 @@
     "fb": "^0.7.3",
     "googleplaces": "^0.6.0",
     "hat": "0.0.3",
+    "moment": "^2.10.6",
     "mongodb-uri": "^0.9.7",
     "mongoose": "^4.1.3",
     "path": "^0.11.14",

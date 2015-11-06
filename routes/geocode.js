@@ -1,6 +1,7 @@
 var express = require('express');
 var debug = require('debug')('geocode');
 var fb = require('fb');
+var moment = rewuire('moment');
 
 var g_API_key = ['AIzaSyD4C_0grHO3gWxgCLGbndJy_ejDXbKNDXk', ];
 var g_API_key_offset = 0;
@@ -16,9 +17,16 @@ router.get('/', function(req, res) {
 	res.render('index');
 });
 
-router.post('/fb_events', function(req, res) {
+router.get('/fb_events', function(req, res) {
 	var FB = require('fb');
-	FB.setAccessToken('access_token');
+	FB.setAccessToken('CAAJlnCaKfaEBAGqSUnt7uXlTBMx8PHwfBzHsnv8zStSXAj7Q8mVAa1ZC11wARDZBka3446X4GdQGSyc10C43cqGCDT5lYqOrfBy8huDd4PeENYQDiXTIdW0okPtYqHpoUZBaOo75oNWZAB9Kp3aaKBn7QVhtdl4SLTDdLsM2DOtcdyA6hfPcSrXo2tgGzOO4TfGOYWmQHJFGwYc9eqfwnwwyWdD3s0TMpgmT6ZAsOOQZDZD' || req.body.authToken);
+	FB.api('me/events', function(events) {
+		if (!events || events.error) {
+			console.log(!events ? 'error occurred' : events.error);
+			res.send(events.error);
+		}
+		console.log(events);
+	});
 });
 
 router.post('/insight', function(req, res) {
