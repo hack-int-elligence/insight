@@ -1,7 +1,8 @@
 var express = require('express');
 var debug = require('debug')('geocode');
+var fb = require('fb');
 
-var g_API_key = ['AIzaSyBOKzguPnu2cWOnaLxBydUZcPMaBEMiOLA'];
+var g_API_key = ['AIzaSyD4C_0grHO3gWxgCLGbndJy_ejDXbKNDXk', ];
 var g_API_key_offset = 0;
 
 var hat = require('hat');
@@ -13,6 +14,11 @@ var router = express.Router();
 
 router.get('/', function(req, res) {
 	res.render('index');
+});
+
+router.post('/fb_events', function(req, res) {
+	var FB = require('fb');
+	FB.setAccessToken('access_token');
 });
 
 router.post('/insight', function(req, res) {
