@@ -20,12 +20,24 @@ router.get('/', function(req, res) {
 router.get('/fb_events', function(req, res) {
 	var FB = require('fb');
 	FB.setAccessToken('CAAJlnCaKfaEBAFko2yc6QQX8W90tzPF5xtO4pZCmJeLRXWhM0ZAqlLsB7Cqyllhjlqj09ZB0GT588jJdmGTu3oKmwu8RBD05vaPvjQRflQYlcIe0gNQSdBog7znxqylAweFYbdWIhHztx6t9ZCVqCCnIzSZAyZBGCbanPuIWpZAOT3hR1XV6zllt6b2KEnfWgZAYEg3MaFFyQWvpwXgS1fooX0L1TFSshmV59BOF7o9wagZDZD' || req.body.authToken);
-	FB.api('me/events', function(events) {
+	FB.api('me/events?date_format=U', function(events) {
 		if (!events || events.error) {
 			console.log(!events ? 'error occurred' : events.error);
 			res.send(events.error);
 		}
-		res.send(events);
+		var acceptedEvents = [];
+		for (var i = 0; i < events.data.length; i++) {
+			var event = event.data[i];
+			if (event.place.latitude && event.place.longitude) {
+				// check to see it has geocodable data
+				// build epoch moment
+				var event_time = moment.unix(event.start_time);
+				if (event_time.isAfter(moment())) {
+					acceptedEvents.push(event);
+				}
+			}
+		}
+		res.send(acceptedEvents);
 	});
 });
 
