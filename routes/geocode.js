@@ -1,7 +1,7 @@
 var express = require('express');
 var debug = require('debug')('geocode');
 var fb = require('fb');
-var moment = rewuire('moment');
+var moment = require('moment');
 
 var g_API_key = ['AIzaSyD4C_0grHO3gWxgCLGbndJy_ejDXbKNDXk', ];
 var g_API_key_offset = 0;
