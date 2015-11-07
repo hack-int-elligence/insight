@@ -12,22 +12,74 @@ var request = require('request');
 var THRESHOLD = 15;
 
 /*
-* Haversine calculation utilities
-*/
+ * Haversine calculation utilities
+ */
 // utility
 var toRadians = function (angle) {
     return angle * (Math.PI / 180);
 };
 // calculates true relative heading
-var haversine = function (latitude1, longitude1, latitude2, longitude2) {
+var haversineAngle = function (latitude1, longitude1, latitude2, longitude2) {
     var y = Math.sin(toRadians(longitude2 - longitude1)) * Math.cos(toRadians(latitude2));
     var x = Math.cos(toRadians(latitude1)) * Math.sin(toRadians(latitude2)) - Math.sin(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.cos(toRadians(longitude2 - longitude1));
     var brng = Math.atan2(y, x);
     brng = brng * 180 / Math.PI;
     // normalize bearing to give true heading between 0-360
     brng = (brng < 0) ? brng + 360 : brng;
-    return brng;
+    // return a rounded version
+    return Math.round(brng);
 };
+
+// calculates true relative distance
+var haversineDistance = function (latitude1, longitude1, latitude2, longitude2) {
+    var R = 6371000; // the earth's radius in metres
+    // azimuth/attitude angles
+    // toRadians(latitude1)
+    // toRadians(latitude2)
+    // toRadians(latitude2 - latitude1)
+    // toRadians(longitude2 - longitude1)
+    var a = Math.sin(toRadians(latitude2 - latitude1)/2) * Math.sin(toRadians(latitude2 - latitude1)/2) +
+            Math.cos(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) *
+            Math.sin(toRadians(longitude2 - longitude1)/2) * Math.sin(toRadians(longitude2 - longitude1)/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return (R * c);
+};
+
+/*
+ * Sorting utility for arrays of objects
+ * Takes an array of objects and a key, and sorts based on the key cast to a number
+ */
+var sortByKey = function (array, key) {
+    return array.sort(function(a, b) {
+        var x = Number(a[key]); var y = Number(b[key]);
+        return ((x < y) ? -1 : ((x > y) ? 1 : 0));
+    });
+};
+
+/*
+ * "Inverts" arrays of locations
+ * Converts an array of locations to an object with keys of rounded headings mapping to
+ * arrays of locations sorted by distance in increasing order
+ */
+var invertHeadingsFromArray = function (array) {
+    var obj = {}, singHeading;
+    array.forEach(function (element) {
+        singHeading = Number(element['heading']);
+        // instantiate new array if the key isn't already contained
+        if (obj.hasOwnProperty(singHeading)) {
+            obj[singHeading].push(element);
+        } else {
+            obj[singHeading] = [];
+            obj[singHeading].push(element);
+        }
+    });
+    // sort each corresponding heading array in the object
+    for (var heading in obj) {
+        sortByKey(obj[heading], 'distance');
+    }
+    return obj;
+};
+
 
 var router = express.Router();
 
@@ -38,6 +90,8 @@ router.get('/', function(req, res) {
 router.post('/fb_events', function(req, res) {
     // announce
     console.log('Making FB event request for current latitude ' + Number(req.body.latitude) + ' and longitude ' + Number(req.body.longitude));
+    // parse radius
+    var radius = req.body.radius || '500';
 
     var FB = require('fb');
     FB.setAccessToken(req.body.authToken);
@@ -54,19 +108,32 @@ router.post('/fb_events', function(req, res) {
                 var event_time = moment(event.start_time);
                 // should be >= current time on the same day
                 if (event_time.isAfter() && event_time.isSame(new Date(), 'day')) {
-                    event.heading = haversine(
+                    event.heading = haversineAngle(
                             // your location
                             Number(req.body.latitude),
                             Number(req.body.longitude),
                             // location of resulting place
                             event.place.location.latitude,
                             event.place.location.longitude
-                        )
-                    acceptedEvents.push(event);
+                        );
+                    event.distance = haversineDistance(
+                            // your location
+                            Number(req.body.latitude),
+                            Number(req.body.longitude),
+                            // location of resulting place
+                            event.place.location.latitude,
+                            event.place.location.longitude
+                        );
+                    // make sure the event is in radius
+                    if (event.distance <= Number(radius)) {
+                        acceptedEvents.push(event);
+                    }
                 }
             }
         }
-        res.send(acceptedEvents);
+        // process events before sending
+        var responseObj = invertHeadingsFromArray(acceptedEvents);
+        res.send(responseObj);
     });
 });
 
@@ -97,23 +164,31 @@ router.post('/insight', function(req, res) {
             console.log('Extracting information for the top: ' + THRESHOLD);
 
             /*
-            * Parse API call results, if valid, process/send response
-            */
+             * Parse API call results, if valid, process/send response
+             */
             if (response.results.length > 0) {
-                var bearing;
+                var bearing, abs_distance;
                 for (var i = 0; i < THRESHOLD; i++) {
                     // using the reference field, make individual PlaceDetails requests via the Places API
                     googleplaces.placeDetailsRequest({
                         reference: response.results[i].reference
                     }, function(detailsErr, details) {
                         // call/calculate true heading
-                        bearing = haversine(
+                        bearing = haversineAngle(
                             // your location
                             Number(req.body.latitude),
                             Number(req.body.longitude),
                             // location of resulting place
                             details.result.geometry.location.lat,
                             details.result.geometry.location.lng
+                        );
+                        abs_distance = haversineDistance(
+                                // your location
+                                Number(req.body.latitude),
+                                Number(req.body.longitude),
+                                // location of resulting place
+                                details.result.geometry.location.lat,
+                                details.result.geometry.location.lng
                         );
                         // must have lat/long geometry for insight
                         if (details.result.geometry) {
@@ -125,12 +200,15 @@ router.post('/insight', function(req, res) {
                                 place_id: details.result.place_id,
                                 address: details.result.formatted_address,
                                 website: details.result.website,
-                                heading: bearing
+                                heading: bearing,
+                                distance: abs_distance
                             });
                             // IMPORTANT: do not modify
                             // async check counter (only sends response when all meta-inf has been retrieved)
                             if (placeDetails.length == resultCount) {
-                                res.send(placeDetails);
+                                // process array of results into formatted object
+                                var responseObj = invertHeadingsFromArray(placeDetails)
+                                res.send(responseObj);
                             }
                         } else {
                             // decrement check counter if result does not have geometry
@@ -139,7 +217,7 @@ router.post('/insight', function(req, res) {
                     });
                 }
             } else {
-                res.send([]);
+                res.send({});
             }
         }
     });
