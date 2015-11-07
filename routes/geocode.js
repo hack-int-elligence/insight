@@ -11,7 +11,7 @@ var hat = require('hat');
 var request = require('request');
 
 var YALE_API_BASE_URL = 'https://gw.its.yale.edu';
-vra YALE_API_KEY = '';
+var YALE_API_KEY = '';
 
 var THRESHOLD = 15;
 
