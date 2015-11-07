@@ -110,6 +110,41 @@ router.get('/', function(req, res) {
     res.render('index');
 });
 
+router.post('/fb_checkin', function(req, res) {
+    var FB = require('fb');
+    FB.setAccessToken(req.body.authToken);
+    // first find the closest page location using FQL radius search of 50m
+    FB.api('fql', {
+        q: 'SELECT page_id,name,latitude,longitude FROM place WHERE distance(latitude, longitude, ' + req.body.latitude + ', ' + req.body.longitude + ') < 50'
+    }, function(response) {
+        if (!response || res.error) {
+            console.log(!res ? 'error occurred' : res.error);
+            res.send(res.error);
+        } else {
+            // check to see the place even exists
+            if (response.data && response.data.length > 0) {
+                // use the first place returned
+                var place_details = response.data[0];
+                console.log(placeDetails);
+                var place_id = '';
+                // currently set to private for testing
+                FB.api('me/feed', 'post', {
+                    body: 'I just checked in here!',
+                    place: place_id,
+                    privacy: {
+                        value: 'SELF'
+                    }
+                }, function(checkinResponse) {
+                    res.status(200).send(checkinResponse);
+                });
+            } else {
+                // if no page found, send back error
+                res.status(500).send('No location found for those coordinates. Check-in failed.')
+            }
+        }
+    });
+});
+
 router.post('/fb_events', function(req, res) {
     // announce
     console.log('Making FB event request for current latitude ' + Number(req.body.latitude) + ' and longitude ' + Number(req.body.longitude));
