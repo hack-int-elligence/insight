@@ -2,6 +2,7 @@ var express = require('express');
 var debug = require('debug')('geocode');
 var fb = require('fb');
 var moment = require('moment');
+var request = require('request');
 
 var g_API_key = ['AIzaSyD4C_0grHO3gWxgCLGbndJy_ejDXbKNDXk', ];
 var g_API_key_offset = 0;
@@ -9,17 +10,20 @@ var g_API_key_offset = 0;
 var hat = require('hat');
 var request = require('request');
 
+var YALE_API_BASE_URL = 'https://gw.its.yale.edu';
+vra YALE_API_KEY = '';
+
 var THRESHOLD = 15;
 
 /*
  * Haversine calculation utilities
  */
 // utility
-var toRadians = function (angle) {
+var toRadians = function(angle) {
     return angle * (Math.PI / 180);
 };
 // calculates true relative heading
-var haversineAngle = function (latitude1, longitude1, latitude2, longitude2) {
+var haversineAngle = function(latitude1, longitude1, latitude2, longitude2) {
     var y = Math.sin(toRadians(longitude2 - longitude1)) * Math.cos(toRadians(latitude2));
     var x = Math.cos(toRadians(latitude1)) * Math.sin(toRadians(latitude2)) - Math.sin(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.cos(toRadians(longitude2 - longitude1));
     var brng = Math.atan2(y, x);
@@ -31,17 +35,17 @@ var haversineAngle = function (latitude1, longitude1, latitude2, longitude2) {
 };
 
 // calculates true relative distance
-var haversineDistance = function (latitude1, longitude1, latitude2, longitude2) {
+var haversineDistance = function(latitude1, longitude1, latitude2, longitude2) {
     var R = 6371000; // the earth's radius in metres
     // azimuth/attitude angles
     // toRadians(latitude1)
     // toRadians(latitude2)
     // toRadians(latitude2 - latitude1)
     // toRadians(longitude2 - longitude1)
-    var a = Math.sin(toRadians(latitude2 - latitude1)/2) * Math.sin(toRadians(latitude2 - latitude1)/2) +
-            Math.cos(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) *
-            Math.sin(toRadians(longitude2 - longitude1)/2) * Math.sin(toRadians(longitude2 - longitude1)/2);
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    var a = Math.sin(toRadians(latitude2 - latitude1) / 2) * Math.sin(toRadians(latitude2 - latitude1) / 2) +
+        Math.cos(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) *
+        Math.sin(toRadians(longitude2 - longitude1) / 2) * Math.sin(toRadians(longitude2 - longitude1) / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return (R * c);
 };
 
@@ -49,9 +53,10 @@ var haversineDistance = function (latitude1, longitude1, latitude2, longitude2) 
  * Sorting utility for arrays of objects
  * Takes an array of objects and a key, and sorts based on the key cast to a number
  */
-var sortByKey = function (array, key) {
+var sortByKey = function(array, key) {
     return array.sort(function(a, b) {
-        var x = Number(a[key]); var y = Number(b[key]);
+        var x = Number(a[key]);
+        var y = Number(b[key]);
         return ((x < y) ? -1 : ((x > y) ? 1 : 0));
     });
 };
@@ -61,9 +66,10 @@ var sortByKey = function (array, key) {
  * Converts an array of locations to an object with keys of rounded headings mapping to
  * arrays of locations sorted by distance in increasing order
  */
-var invertHeadingsFromArray = function (array) {
-    var obj = {}, singHeading;
-    array.forEach(function (element) {
+var invertHeadingsFromArray = function(array) {
+    var obj = {},
+        singHeading;
+    array.forEach(function(element) {
         singHeading = Number(element['heading']);
         // instantiate new array if the key isn't already contained
         if (obj.hasOwnProperty(singHeading)) {
@@ -80,6 +86,23 @@ var invertHeadingsFromArray = function (array) {
     return obj;
 };
 
+/*
+ * Gets Yale building data, for YHack demo
+ */
+var getYaleBuildings = function(callback) {
+    var buildingDataFeed = YALE_API_BASE_URL + '/soa-gateway/buildings/feed?type=json?apikey=' + YALE_API_KEY;
+    var requestURL = encodeURIComponent(buildingDataFeed);
+    request(requestURL, function(error, response, body) {
+        if (!error && response.statusCode == 200) {
+            // JSON of building data is in 'body'
+            // contains a lot of information, the keys of which can be standardised based on app needs
+            callback(body);
+        } else {
+            // return empty array so that the rest of the data is unspoiled
+            callback([]);
+        }
+    });
+};
 
 var router = express.Router();
 
@@ -109,21 +132,21 @@ router.post('/fb_events', function(req, res) {
                 // should be >= current time on the same day
                 if (event_time.isAfter() && event_time.isSame(new Date(), 'day')) {
                     event.heading = haversineAngle(
-                            // your location
-                            Number(req.body.latitude),
-                            Number(req.body.longitude),
-                            // location of resulting place
-                            event.place.location.latitude,
-                            event.place.location.longitude
-                        );
+                        // your location
+                        Number(req.body.latitude),
+                        Number(req.body.longitude),
+                        // location of resulting place
+                        event.place.location.latitude,
+                        event.place.location.longitude
+                    );
                     event.distance = haversineDistance(
-                            // your location
-                            Number(req.body.latitude),
-                            Number(req.body.longitude),
-                            // location of resulting place
-                            event.place.location.latitude,
-                            event.place.location.longitude
-                        );
+                        // your location
+                        Number(req.body.latitude),
+                        Number(req.body.longitude),
+                        // location of resulting place
+                        event.place.location.latitude,
+                        event.place.location.longitude
+                    );
                     // make sure the event is in radius
                     if (event.distance <= Number(radius)) {
                         acceptedEvents.push(event);
@@ -183,12 +206,12 @@ router.post('/insight', function(req, res) {
                             details.result.geometry.location.lng
                         );
                         abs_distance = haversineDistance(
-                                // your location
-                                Number(req.body.latitude),
-                                Number(req.body.longitude),
-                                // location of resulting place
-                                details.result.geometry.location.lat,
-                                details.result.geometry.location.lng
+                            // your location
+                            Number(req.body.latitude),
+                            Number(req.body.longitude),
+                            // location of resulting place
+                            details.result.geometry.location.lat,
+                            details.result.geometry.location.lng
                         );
                         // must have lat/long geometry for insight
                         if (details.result.geometry) {
@@ -206,9 +229,14 @@ router.post('/insight', function(req, res) {
                             // IMPORTANT: do not modify
                             // async check counter (only sends response when all meta-inf has been retrieved)
                             if (placeDetails.length == resultCount) {
-                                // process array of results into formatted object
-                                var responseObj = invertHeadingsFromArray(placeDetails)
-                                res.send(responseObj);
+                                // add in yale building data - should currently fail and return original data without API key
+                                getYaleBuildings(function(buildingArray) {
+                                    // will currently concat an empty array; NBD
+                                    placeDetails.concat(buildingArray);
+                                    // process array of results into formatted object
+                                    var responseObj = invertHeadingsFromArray(placeDetails);
+                                    res.send(responseObj);
+                                });
                             }
                         } else {
                             // decrement check counter if result does not have geometry
