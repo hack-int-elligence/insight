@@ -35,7 +35,7 @@ var haversineAngle = function(latitude1, longitude1, latitude2, longitude2) {
     var x = Math.cos(toRadians(latitude1)) * Math.sin(toRadians(latitude2)) - Math.sin(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.cos(toRadians(longitude2 - longitude1));
     var brng = Math.atan2(y, x);
     brng = brng * 180 / Math.PI;
-    
+
     // normalize bearing to give true heading between 0-360
     // this calculation is moved to inline in order to preserve
     // data important for parallax
@@ -125,7 +125,7 @@ router.post('/fb_checkin', function(req, res) {
     FB.setAccessToken(req.body.authToken);
     var deprecatedFQLQuery = 'SELECT page_id,name,latitude,longitude FROM place WHERE distance(latitude, longitude, ' + req.body.latitude + ', ' + req.body.longitude + ') < 50';
     // generate app access token for search through Pages on the Graph API
-    request('https://graph.facebook.com/oauth/access_token?client_id=' + FACEBOOK_APP_ID + '&client_secret=' + FACEBOOK_APP_SECRET + '&grant_type=client_credentials', function(e,r,b) {
+    request('https://graph.facebook.com/oauth/access_token?client_id=' + FACEBOOK_APP_ID + '&client_secret=' + FACEBOOK_APP_SECRET + '&grant_type=client_credentials', function(e, r, b) {
         var app_access_token = b.split('=')[1];
         // use generated token
         FB.setAccessToken(app_access_token);
@@ -238,10 +238,12 @@ router.post('/insight', function(req, res) {
      * YALE BUILDINGS
      */
     // add in yale building data - should currently fail and return original data without API key
-    var addYaleBuildings = function (existingArray, callback) {
+    var addYaleBuildings = function(existingArray, callback) {
         getYaleBuildings(function(buildingArray) {
-            var yaleBDistance, i = 0, element, numResults = 0;
-            for (i = 0; (i < buildingArray.length) && (numResults <= THRESHOLD); i++) {
+            var yaleBDistance, i = 0,
+                element, numResults = 0;
+            for (i = 0;
+                (i < buildingArray.length) && (numResults <= THRESHOLD); i++) {
                 element = buildingArray[i];
                 // call/calculate true heading
                 bearing = haversineAngle(
@@ -253,13 +255,13 @@ router.post('/insight', function(req, res) {
                     Number(element['LONGITUDE'])
                 );
                 yaleBDistance = haversineDistance(
-                        // your location
-                        Number(req.body.latitude),
-                        Number(req.body.longitude),
-                        // location of resulting place
-                        Number(element['LATITUDE']),
-                        Number(element['LONGITUDE'])
-                    );
+                    // your location
+                    Number(req.body.latitude),
+                    Number(req.body.longitude),
+                    // location of resulting place
+                    Number(element['LATITUDE']),
+                    Number(element['LONGITUDE'])
+                );
                 if (yaleBDistance <= placeRadius) {
                     element.distance = yaleBDistance;
                     element.heading = (bearing < 0) ? bearing + 360 : bearing;
@@ -281,7 +283,7 @@ router.post('/insight', function(req, res) {
      * results.
      */
     // add in yale building data - should currently fail and return original data without API key
-    var infoCallback = function (response, i, existingArray, itemCount, callback) {
+    var infoCallback = function(response, i, existingArray, itemCount, callback) {
         if (itemCount === THRESHOLD) {
             return callback(existingArray);
         }
@@ -318,6 +320,9 @@ router.post('/insight', function(req, res) {
                     place_id: details.result.place_id,
                     address: details.result.formatted_address,
                     website: details.result.website,
+                    rating: details.result.rating,
+                    reviews: details.result.reviews,
+                    tags: details.result.types,
                     heading: (bearing < 0) ? bearing + 360 : bearing,
                     headingRelative: bearing,
                     distance: abs_distance
@@ -342,7 +347,7 @@ router.post('/insight', function(req, res) {
      * use default radius as 500m
      * default seach category is 'restaurants'
      */
-    var addGoogleRadarSearch = function (existingArray, callback) {
+    var addGoogleRadarSearch = function(existingArray, callback) {
         googleplaces.radarSearch({
             location: [Number(req.body.latitude), Number(req.body.longitude)],
             radius: placeRadius,
@@ -371,8 +376,8 @@ router.post('/insight', function(req, res) {
     // for every place reference in the response, gather meta-info
     var placeDetails = [];
     if (req.body.query === undefined) {
-        addYaleBuildings(placeDetails, function (yaleArray) {
-            addGoogleRadarSearch(yaleArray, function (finalArray) {
+        addYaleBuildings(placeDetails, function(yaleArray) {
+            addGoogleRadarSearch(yaleArray, function(finalArray) {
                 // sort the final array by distance
                 sortByKey(finalArray, 'distance');
                 // splice the array in half, since we have THRESHOLD * 2 total elements
@@ -382,13 +387,13 @@ router.post('/insight', function(req, res) {
             });
         });
     } else if (req.body.query === 'yale') {
-        addYaleBuildings(placeDetails, function (yaleArray) {
+        addYaleBuildings(placeDetails, function(yaleArray) {
             // sort the final array by distance
             sortByKey(yaleArray, 'distance');
             res.send(yaleArray);
         });
     } else if (req.body.query === 'places') {
-        addGoogleRadarSearch(placeDetails, function (placesArray) {
+        addGoogleRadarSearch(placeDetails, function(placesArray) {
             // sort the final array by distance
             sortByKey(placesArray, 'distance');
             res.send(placesArray);
@@ -396,17 +401,17 @@ router.post('/insight', function(req, res) {
     }
 });
 
-router.post('/directions', function (req, res) {
+router.post('/directions', function(req, res) {
     // CREATE REQUEST URL
     var request_url = "http://dev.virtualearth.net/REST/v1/Routes?wp.0=" +
-    // current location parameters for 0th waypoint
-    req.body.currentLocationLatitude + "," + req.body.currentLocationLongitude +
-    // destination location parameters for destination (wp 1)
-    "&wp.1=" + req.body.destinationLatitude + "," + req.body.destinationLongitude +
-     "&routePathOutput=Points&output=json&jsonp=RouteCallback&key=" + bing_maps_api_key;
+        // current location parameters for 0th waypoint
+        req.body.currentLocationLatitude + "," + req.body.currentLocationLongitude +
+        // destination location parameters for destination (wp 1)
+        "&wp.1=" + req.body.destinationLatitude + "," + req.body.destinationLongitude +
+        "&routePathOutput=Points&output=json&jsonp=RouteCallback&key=" + bing_maps_api_key;
 
     // SEND REQUEST
-    request(request_url, function (error, response, body) {
+    request(request_url, function(error, response, body) {
         if (!error && response.statusCode == 200) {
             // WARNING - UNREADABLE CODE AHEAD
             // because of a truly intriguing bug within the Bing Maps API, 
@@ -420,7 +425,7 @@ router.post('/directions', function (req, res) {
                 steps: []
             };
             // Aggregate each step
-            routeLegs['itineraryItems'].forEach(function (element) {
+            routeLegs['itineraryItems'].forEach(function(element) {
                 responseObj['steps'].push({
                     text: element['instruction']['text'],
                     distance: element['travelDistance']
