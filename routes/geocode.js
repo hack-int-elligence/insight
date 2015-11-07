@@ -51,7 +51,7 @@ router.post('/fb_events', function(req, res) {
                 // check to see it has geocodable data & build epoch stamp
                 var event_time = moment(event.start_time);
                 // should be >= current time on the same day
-                if (event_time.isAfter() && event_time.isSame(new Date(), 'day')) {
+                // if (event_time.isAfter() && event_time.isSame(new Date(), 'day')) {
                     event.heading = haversine(
                             // your location
                             Number(req.body.latitude),
@@ -61,7 +61,7 @@ router.post('/fb_events', function(req, res) {
                             event.place.location.longitude
                         )
                     acceptedEvents.push(event);
-                }
+                // }
             }
         }
         res.send(acceptedEvents);
