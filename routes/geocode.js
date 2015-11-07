@@ -7,6 +7,8 @@ var request = require('request');
 var g_API_key = ['AIzaSyD4C_0grHO3gWxgCLGbndJy_ejDXbKNDXk', ];
 var g_API_key_offset = 0;
 
+var bing_maps_api_key = "AjP-pU7xn-GBz_RLNnVL6oUckIzfj-q90bdJ69_wLtviEa7ZnBf7PHbPicPYPNr7";
+
 var hat = require('hat');
 var request = require('request');
 
@@ -247,6 +249,49 @@ router.post('/insight', function(req, res) {
             } else {
                 res.send({});
             }
+        }
+    });
+});
+
+router.post('/directions', function (req, res) {
+    // CREATE REQUEST URL
+    var request_url = "http://dev.virtualearth.net/REST/v1/Routes?wp.0=" +
+    // current location parameters for 0th waypoint
+    req.body.currentLocationLatitude + "," + req.body.currentLocationLongitude +
+    // destination location parameters for destination (wp 1)
+    "&wp.1=" + req.body.destinationLatitude + "," + req.body.destinationLongitude +
+     "&routePathOutput=Points&output=json&jsonp=RouteCallback&key=" + bing_maps_api_key;
+
+    // SEND REQUEST
+    request(request_url, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            // WARNING - UNREADABLE CODE AHEAD
+            // because of a truly intriguing bug within the Bing Maps API, 
+            // the callback must be handled in this way, must be named RouteCallback,
+            // and can't actually be called anyways once returned.
+            // do length - 2 to cut out the end parenthesis
+            var directionsObj = response.body.substring(15, response.body.length - 1);
+            var routeLegs = JSON.parse(directionsObj)['resourceSets'][0]['resources'][0]['routeLegs'][0];
+            var responseObj = {
+                destinationDescription: routeLegs['description'],
+                steps: []
+            };
+            // Aggregate each step
+            routeLegs['itineraryItems'].forEach(function (element) {
+                responseObj['steps'].push({
+                    text: element['instruction']['text'],
+                    distance: element['travelDistance']
+                });
+            });
+            // object struture:
+            // base object has two keys: 'description' describes the destination
+            // other key is 'steps', which holds an array of objects with:
+            // a key for text (describing the instruction)
+            // and distance traveled during that step
+            res.send(responseObj);
+        } else {
+            // Send back the error
+            res.send(error);
         }
     });
 });
