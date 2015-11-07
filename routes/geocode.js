@@ -123,10 +123,12 @@ router.post('/fb_checkin', function(req, res) {
     var FB = require('fb');
     FB.setAccessToken(req.body.authToken);
     var deprecatedFQLQuery = 'SELECT page_id,name,latitude,longitude FROM place WHERE distance(latitude, longitude, ' + req.body.latitude + ', ' + req.body.longitude + ') < 50';
-    // first find the closest page location using FQL radius search of 50m
+    // generate app access token for search through Pages on the Graph API
     request('https://graph.facebook.com/oauth/access_token?client_id=' + FACEBOOK_APP_ID + '&client_secret=' + FACEBOOK_APP_SECRET + '&grant_type=client_credentials', function(e,r,b) {
         var app_access_token = b.split('=')[1];
+        // use generated token
         FB.setAccessToken(app_access_token);
+        // run a Pages query search by name and proximity to location (radius based)
         FB.api('/search', {
             q: req.body.name,
             type: 'page',
@@ -143,8 +145,9 @@ router.post('/fb_checkin', function(req, res) {
                     var place_details = response.data[0];
                     console.log(place_details);
                     var place_id = place_details.id;
-                    // currently set to private for testing
+                    // revert back to client access token for proper scope permissions
                     FB.setAccessToken(req.body.authToken);
+                    // POST a new check in that's private on the timeline
                     FB.api('me/feed', 'post', {
                         body: 'I just checked in at ' + place_details.name,
                         place: place_id,
@@ -152,7 +155,9 @@ router.post('/fb_checkin', function(req, res) {
                             value: 'SELF'
                         }
                     }, function(checkinResponse) {
+                        // log out the genereated post ID for reference
                         console.log(checkinResponse);
+                        // send back data to the phone, just because I have no use for it and we might as well keep it somewhere
                         res.status(200).send(checkinResponse);
                     });
                 } else {
