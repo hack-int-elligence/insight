@@ -135,6 +135,7 @@ router.post('/fb_checkin', function(req, res) {
                         value: 'SELF'
                     }
                 }, function(checkinResponse) {
+                    console.log(checkinResponse);
                     res.status(200).send(checkinResponse);
                 });
             } else {
