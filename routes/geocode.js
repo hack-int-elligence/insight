@@ -7,13 +7,15 @@ var request = require('request');
 var g_API_key = ['AIzaSyD4C_0grHO3gWxgCLGbndJy_ejDXbKNDXk', ];
 var g_API_key_offset = 0;
 
+var bing_maps_api_key = "AjP-pU7xn-GBz_RLNnVL6oUckIzfj-q90bdJ69_wLtviEa7ZnBf7PHbPicPYPNr7";
+
 var hat = require('hat');
 var request = require('request');
 
 var YALE_API_BASE_URL = 'https://gw.its.yale.edu';
 var YALE_API_KEY = '';
 
-var THRESHOLD = 15;
+var THRESHOLD = 5;
 
 /*
  * Haversine calculation utilities
@@ -28,8 +30,12 @@ var haversineAngle = function(latitude1, longitude1, latitude2, longitude2) {
     var x = Math.cos(toRadians(latitude1)) * Math.sin(toRadians(latitude2)) - Math.sin(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.cos(toRadians(longitude2 - longitude1));
     var brng = Math.atan2(y, x);
     brng = brng * 180 / Math.PI;
+    
     // normalize bearing to give true heading between 0-360
-    brng = (brng < 0) ? brng + 360 : brng;
+    // this calculation is moved to inline in order to preserve
+    // data important for parallax
+    // brng = (brng < 0) ? brng + 360 : brng;
+
     // return a rounded version
     return Math.round(brng);
 };
@@ -167,7 +173,7 @@ router.post('/fb_events', function(req, res) {
                 var event_time = moment(event.start_time);
                 // should be >= current time on the same day
                 if (event_time.isAfter() && event_time.isSame(new Date(), 'day')) {
-                    event.heading = haversineAngle(
+                    var bearing = haversineAngle(
                         // your location
                         Number(req.body.latitude),
                         Number(req.body.longitude),
@@ -175,6 +181,8 @@ router.post('/fb_events', function(req, res) {
                         event.place.location.latitude,
                         event.place.location.longitude
                     );
+                    event.heading = (bearing < 0) ? bearing + 360 : bearing;
+                    event.headingRelative = bearing;
                     event.distance = haversineDistance(
                         // your location
                         Number(req.body.latitude),
@@ -191,7 +199,8 @@ router.post('/fb_events', function(req, res) {
             }
         }
         // process events before sending
-        var responseObj = invertHeadingsFromArray(acceptedEvents);
+        var responseObj = acceptedEvents;
+        // responseObj = invertHeadingsFromArray(acceptedEvents);
         res.send(responseObj);
     });
 });
@@ -259,7 +268,8 @@ router.post('/insight', function(req, res) {
                                 place_id: details.result.place_id,
                                 address: details.result.formatted_address,
                                 website: details.result.website,
-                                heading: bearing,
+                                heading: (bearing < 0) ? bearing + 360 : bearing,
+                                headingRelative: bearing,
                                 distance: abs_distance
                             });
                             // IMPORTANT: do not modify
@@ -270,7 +280,8 @@ router.post('/insight', function(req, res) {
                                     // will currently concat an empty array; NBD
                                     placeDetails.concat(buildingArray);
                                     // process array of results into formatted object
-                                    var responseObj = invertHeadingsFromArray(placeDetails);
+                                    var responseObj = placeDetails;
+                                    // responseObj = invertHeadingsFromArray(placeDetails);
                                     res.send(responseObj);
                                 });
                             }
@@ -283,6 +294,49 @@ router.post('/insight', function(req, res) {
             } else {
                 res.send({});
             }
+        }
+    });
+});
+
+router.post('/directions', function (req, res) {
+    // CREATE REQUEST URL
+    var request_url = "http://dev.virtualearth.net/REST/v1/Routes?wp.0=" +
+    // current location parameters for 0th waypoint
+    req.body.currentLocationLatitude + "," + req.body.currentLocationLongitude +
+    // destination location parameters for destination (wp 1)
+    "&wp.1=" + req.body.destinationLatitude + "," + req.body.destinationLongitude +
+     "&routePathOutput=Points&output=json&jsonp=RouteCallback&key=" + bing_maps_api_key;
+
+    // SEND REQUEST
+    request(request_url, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            // WARNING - UNREADABLE CODE AHEAD
+            // because of a truly intriguing bug within the Bing Maps API, 
+            // the callback must be handled in this way, must be named RouteCallback,
+            // and can't actually be called anyways once returned.
+            // do length - 2 to cut out the end parenthesis
+            var directionsObj = response.body.substring(15, response.body.length - 1);
+            var routeLegs = JSON.parse(directionsObj)['resourceSets'][0]['resources'][0]['routeLegs'][0];
+            var responseObj = {
+                destinationDescription: routeLegs['description'],
+                steps: []
+            };
+            // Aggregate each step
+            routeLegs['itineraryItems'].forEach(function (element) {
+                responseObj['steps'].push({
+                    text: element['instruction']['text'],
+                    distance: element['travelDistance']
+                });
+            });
+            // object struture:
+            // base object has two keys: 'description' describes the destination
+            // other key is 'steps', which holds an array of objects with:
+            // a key for text (describing the instruction)
+            // and distance traveled during that step
+            res.send(responseObj);
+        } else {
+            // Send back the error
+            res.send(error);
         }
     });
 });
