@@ -13,9 +13,9 @@ var hat = require('hat');
 var request = require('request');
 
 var YALE_API_BASE_URL = 'https://gw.its.yale.edu';
-var YALE_API_KEY = '';
+var YALE_API_KEY = 'l7xx9ebbe4eb200e44679ab221819d1c2b3f';
 
-var THRESHOLD = 5;
+var THRESHOLD = 10;
 
 /*
  * Haversine calculation utilities
@@ -96,13 +96,12 @@ var invertHeadingsFromArray = function(array) {
  * Gets Yale building data, for YHack demo
  */
 var getYaleBuildings = function(callback) {
-    var buildingDataFeed = YALE_API_BASE_URL + '/soa-gateway/buildings/feed?type=json?apikey=' + YALE_API_KEY;
-    var requestURL = encodeURIComponent(buildingDataFeed);
-    request(requestURL, function(error, response, body) {
+    var requestUrl = 'https://gw.its.yale.edu/soa-gateway/buildings/feed?type=json&apikey=' + YALE_API_KEY;
+    request(requestUrl, function(error, response, body) {
         if (!error && response.statusCode == 200) {
             // JSON of building data is in 'body'
             // contains a lot of information, the keys of which can be standardised based on app needs
-            callback(body);
+            callback(JSON.parse(body)['ServiceResponse']['Buildings']['Building']);
         } else {
             // return empty array so that the rest of the data is unspoiled
             callback([]);
@@ -200,6 +199,8 @@ router.post('/fb_events', function(req, res) {
         // process events before sending
         var responseObj = acceptedEvents;
         // responseObj = invertHeadingsFromArray(acceptedEvents);
+        // Sort by distance
+        responseObj = sortByKey(repsonseObj, 'distance');
         res.send(responseObj);
     });
 });
@@ -210,91 +211,169 @@ router.post('/insight', function(req, res) {
     // announce
     console.log('Making request for latitude ' + Number(req.body.latitude) + ' and longitude ' + Number(req.body.longitude));
 
-    // start a RadarSearch via the Google Places API
-    // use default radius as 500m
-    // default seach category is 'restaurants'
-    googleplaces.radarSearch({
-        location: [Number(req.body.latitude), Number(req.body.longitude)],
-        radius: req.body.radius || '500',
-        types: req.body.categories || ['restaurant']
-    }, function(error, response) {
-        if (error) {
-            // if there's an error, send back the error
-            res.send(error);
-        } else {
-            // for every place reference in the response, gather meta-info
-            var placeDetails = [];
-            // only gather info for the first <THRESHOLD> references
-            var resultCount = THRESHOLD;
+    // set radius
+    var placeRadius = Number(req.body.radius || '500');
 
-            console.log('found ' + response.results.length + ' results');
-            console.log('Extracting information for the top: ' + THRESHOLD);
+    /*
+     * YALE BUILDINGS
+     */
+    // add in yale building data - should currently fail and return original data without API key
+    var addYaleBuildings = function (existingArray, callback) {
+        getYaleBuildings(function(buildingArray) {
+            var yaleBDistance, i = 0, element, numResults = 0;
+            for (i = 0; (i < buildingArray.length) && (numResults <= THRESHOLD); i++) {
+                element = buildingArray[i];
+                // call/calculate true heading
+                bearing = haversineAngle(
+                    // your location
+                    Number(req.body.latitude),
+                    Number(req.body.longitude),
+                    // location of resulting place
+                    Number(element['LATITUDE']),
+                    Number(element['LONGITUDE'])
+                );
+                yaleBDistance = haversineDistance(
+                        // your location
+                        Number(req.body.latitude),
+                        Number(req.body.longitude),
+                        // location of resulting place
+                        Number(element['LATITUDE']),
+                        Number(element['LONGITUDE'])
+                    );
+                if (yaleBDistance <= placeRadius) {
+                    element.distance = yaleBDistance;
+                    element.heading = (bearing < 0) ? bearing + 360 : bearing;
+                    element.headingRelative = bearing;
+                    existingArray.push(element);
+                    numResults++;
+                }
+            }
+            callback(existingArray);
+        });
+    };
 
-            /*
-             * Parse API call results, if valid, process/send response
-             */
-            if (response.results.length > 0) {
-                var bearing, abs_distance;
-                for (var i = 0; i < THRESHOLD; i++) {
-                    // using the reference field, make individual PlaceDetails requests via the Places API
-                    googleplaces.placeDetailsRequest({
-                        reference: response.results[i].reference
-                    }, function(detailsErr, details) {
-                        // call/calculate true heading
-                        bearing = haversineAngle(
-                            // your location
-                            Number(req.body.latitude),
-                            Number(req.body.longitude),
-                            // location of resulting place
-                            details.result.geometry.location.lat,
-                            details.result.geometry.location.lng
-                        );
-                        abs_distance = haversineDistance(
-                            // your location
-                            Number(req.body.latitude),
-                            Number(req.body.longitude),
-                            // location of resulting place
-                            details.result.geometry.location.lat,
-                            details.result.geometry.location.lng
-                        );
-                        // must have lat/long geometry for insight
-                        if (details.result.geometry) {
-                            // push only relevent API response information
-                            placeDetails.push({
-                                name: details.result.name,
-                                location: details.result.geometry.location,
-                                icon: details.result.icon,
-                                place_id: details.result.place_id,
-                                address: details.result.formatted_address,
-                                website: details.result.website,
-                                heading: (bearing < 0) ? bearing + 360 : bearing,
-                                headingRelative: bearing,
-                                distance: abs_distance
-                            });
-                            // IMPORTANT: do not modify
-                            // async check counter (only sends response when all meta-inf has been retrieved)
-                            if (placeDetails.length == resultCount) {
-                                // add in yale building data - should currently fail and return original data without API key
-                                getYaleBuildings(function(buildingArray) {
-                                    // will currently concat an empty array; NBD
-                                    placeDetails.concat(buildingArray);
-                                    // process array of results into formatted object
-                                    var responseObj = placeDetails;
-                                    // responseObj = invertHeadingsFromArray(placeDetails);
-                                    res.send(responseObj);
-                                });
-                            }
-                        } else {
-                            // decrement check counter if result does not have geometry
-                            resultCount -= 1;
-                        }
-                    });
+
+    /*
+     * Recrusive asynchronous callback, which calls the final execution
+     * callback to end the recursion (called 'callback' - carried down until
+     * the bottom out case).
+     * Enables dynamic filtering during list population to get true closest   
+     * results.
+     */
+    // add in yale building data - should currently fail and return original data without API key
+    var infoCallback = function (response, i, existingArray, itemCount, callback) {
+        if (itemCount === THRESHOLD) {
+            return callback(existingArray);
+        }
+        // using the reference field, make individual PlaceDetails requests via the Places API
+        googleplaces.placeDetailsRequest({
+            reference: response.results[i].reference
+        }, function(detailsErr, details) {
+            // call/calculate true heading
+            bearing = haversineAngle(
+                // your location
+                Number(req.body.latitude),
+                Number(req.body.longitude),
+                // location of resulting place
+                details.result.geometry.location.lat,
+                details.result.geometry.location.lng
+            );
+            abs_distance = haversineDistance(
+                // your location
+                Number(req.body.latitude),
+                Number(req.body.longitude),
+                // location of resulting place
+                details.result.geometry.location.lat,
+                details.result.geometry.location.lng
+            );
+            // must have lat/long geometry for insight
+            if (details.result.geometry && abs_distance <= placeRadius) {
+                // resultCount = resultCount + 1;
+                // console.log(resultCount);
+                // push only relevent API response information
+                existingArray.push({
+                    name: details.result.name,
+                    location: details.result.geometry.location,
+                    icon: details.result.icon,
+                    place_id: details.result.place_id,
+                    address: details.result.formatted_address,
+                    website: details.result.website,
+                    heading: (bearing < 0) ? bearing + 360 : bearing,
+                    headingRelative: bearing,
+                    distance: abs_distance
+                });
+                if (existingArray.length < (THRESHOLD * 2)) {
+                    var returnVal = infoCallback(response, (i + 1), existingArray, (itemCount + 1), callback);
+                    return returnVal;
+                } else {
+                    return existingArray;
                 }
             } else {
-                res.send({});
+                var returnVal = infoCallback(response, (i + 1), existingArray, (itemCount + 1), callback);
+                return returnVal;
             }
-        }
-    });
+        });
+    };
+
+    /* 
+     * GOOGLE RADAR SEARCH
+     *
+     * start a RadarSearch via the Google Places API
+     * use default radius as 500m
+     * default seach category is 'restaurants'
+     */
+    var addGoogleRadarSearch = function (existingArray, callback) {
+        googleplaces.radarSearch({
+            location: [Number(req.body.latitude), Number(req.body.longitude)],
+            radius: placeRadius,
+            types: req.body.categories || ['restaurant']
+        }, function(error, response) {
+            if (error) {
+                // if there's an error, send back the error
+                res.send(error);
+            } else {
+                /*
+                 * Parse API call results, if valid, process/send response
+                 */
+                var bearing, abs_distance, resultCount = 0;
+                // only gather info for the first <THRESHOLD> references
+                // use recursive helper, with given callback
+                infoCallback(response, 0, existingArray, 0, callback);
+            }
+        });
+    };
+
+    /* 
+     * MASTER REQUEST HANDLER
+     *
+     * handle the functions/callbacks with requests as necessary
+     */
+    // for every place reference in the response, gather meta-info
+    var placeDetails = [];
+    if (req.body.query === undefined) {
+        addYaleBuildings(placeDetails, function (yaleArray) {
+            addGoogleRadarSearch(yaleArray, function (finalArray) {
+                // sort the final array by distance
+                sortByKey(finalArray, 'distance');
+                // splice the array in half, since we have THRESHOLD * 2 total elements
+                // (THRESHOLD) from each
+                var splicedArr = finalArray.splice(0, Math.floor(THRESHOLD));
+                res.send(splicedArr);
+            });
+        });
+    } else if (req.body.query === 'yale') {
+        addYaleBuildings(placeDetails, function (yaleArray) {
+            // sort the final array by distance
+            sortByKey(yaleArray, 'distance');
+            res.send(yaleArray);
+        });
+    } else if (req.body.query === 'places') {
+        addGoogleRadarSearch(placeDetails, function (placesArray) {
+            // sort the final array by distance
+            sortByKey(placesArray, 'distance');
+            res.send(placesArray);
+        });
+    }
 });
 
 router.post('/directions', function (req, res) {
