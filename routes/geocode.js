@@ -11,6 +11,22 @@ var request = require('request');
 
 var THRESHOLD = 15;
 
+/*
+* Haversine calculation utilities
+*/
+// utility
+var toRadians = function (angle) {
+    return angle * (Math.PI / 180);
+};
+// calculates true relative heading
+var haversine = function (latitude1, longitude1, latitude2, longitude2) {
+    var y = Math.sin(toRadians(longitude2 - longitude1)) * Math.cos(toRadians(latitude2));
+    var x = Math.cos(toRadians(latitude1)) * Math.sin(toRadians(latitude2)) - Math.sin(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.cos(toRadians(longitude2 - longitude1));
+    var brng = Math.atan2(y, x);
+    brng = brng * 180 / Math.PI;
+    return brng;
+};
+
 var router = express.Router();
 
 router.get('/', function(req, res) {
@@ -18,6 +34,9 @@ router.get('/', function(req, res) {
 });
 
 router.post('/fb_events', function(req, res) {
+    // announce
+    console.log('Making FB event request for current latitude ' + Number(req.body.latitude) + ' and longitude ' + Number(req.body.longitude));
+
     var FB = require('fb');
     FB.setAccessToken(req.body.authToken);
     FB.api('me/events', function(events) {
@@ -33,6 +52,14 @@ router.post('/fb_events', function(req, res) {
                 var event_time = moment(event.start_time);
                 // should be >= current time on the same day
                 if (event_time.isAfter() && event_time.isSame(new Date(), 'day')) {
+                    event.heading = haversine(
+                            // your location
+                            Number(req.body.latitude),
+                            Number(req.body.longitude),
+                            // location of resulting place
+                            event.place.location.latitude,
+                            event.place.location.longitude
+                        )
                     acceptedEvents.push(event);
                 }
             }
@@ -45,7 +72,7 @@ router.post('/insight', function(req, res) {
     // require the google places module inside the route handler to change the config key
     var googleplaces = require('googleplaces')(g_API_key[g_API_key_offset], 'json');
     // announce
-    console.log('Making request for latitude ' + Number(req.body.latitude) + ' and logitude ' + Number(req.body.longitude));
+    console.log('Making request for latitude ' + Number(req.body.latitude) + ' and longitude ' + Number(req.body.longitude));
 
     // start a RadarSearch via the Google Places API
     // use default radius as 500m
@@ -68,22 +95,6 @@ router.post('/insight', function(req, res) {
             console.log('Extracting information for the top: ' + THRESHOLD);
 
             /*
-            * Haversine calculation utilities
-            */
-            // utility
-            var toRadians = function (angle) {
-                return angle * (Math.PI / 180);
-            }
-            // calculates true relative heading
-            var haversine = function (latitude1, longitude1, latitude2, longitude2) {
-                var y = Math.sin(toRadians(longitude2 - longitude1)) * Math.cos(toRadians(latitude2));
-                var x = Math.cos(toRadians(latitude1)) * Math.sin(toRadians(latitude2)) - Math.sin(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.cos(toRadians(longitude2 - longitude1));
-                var brng = Math.atan2(y, x);
-                brng = brng * 180 / Math.PI;
-                return brng;
-            };
-
-            /*
             * Parse API call results, if valid, process/send response
             */
             if (response.results.length > 0) {
@@ -96,8 +107,8 @@ router.post('/insight', function(req, res) {
                         // call/calculate true heading
                         bearing = haversine(
                             // your location
-                            req.body.latitude,
-                            req.body.longitude,
+                            Number(req.body.latitude),
+                            Number(req.body.longitude),
                             // location of resulting place
                             details.result.geometry.location.lat,
                             details.result.geometry.location.lng
