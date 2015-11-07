@@ -266,6 +266,12 @@ router.post('/insight', function(req, res) {
                     element.distance = yaleBDistance;
                     element.heading = (bearing < 0) ? bearing + 360 : bearing;
                     element.headingRelative = bearing;
+                    element.name = element['DESCRIPTION'];
+                    element.location = {
+                        lat: Number(element['LATITUDE']),
+                        lng: Number(element['LONGITUDE'])
+                    };
+                    element.address = element['ADDRESS_1'] + ' ' + element['ADDRESS_2'] + ' ' + element['ADDRESS_3'];
                     existingArray.push(element);
                     numResults++;
                 }
@@ -375,7 +381,7 @@ router.post('/insight', function(req, res) {
      */
     // for every place reference in the response, gather meta-info
     var placeDetails = [];
-    if (req.body.query === undefined) {
+    if (req.body.query === undefined || req.body.query === 'all') {
         addYaleBuildings(placeDetails, function(yaleArray) {
             addGoogleRadarSearch(yaleArray, function(finalArray) {
                 // sort the final array by distance
