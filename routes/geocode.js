@@ -24,6 +24,8 @@ var haversine = function (latitude1, longitude1, latitude2, longitude2) {
     var x = Math.cos(toRadians(latitude1)) * Math.sin(toRadians(latitude2)) - Math.sin(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.cos(toRadians(longitude2 - longitude1));
     var brng = Math.atan2(y, x);
     brng = brng * 180 / Math.PI;
+    // normalize bearing to give true heading between 0-360
+    brng = (brng < 0) ? brng + 360 : brng;
     return brng;
 };
 
@@ -113,8 +115,6 @@ router.post('/insight', function(req, res) {
                             details.result.geometry.location.lat,
                             details.result.geometry.location.lng
                         );
-                        // normalize bearing to give true heading between 0-360
-                        bearing = (bearing < 0) ? bearing + 360 : bearing;
                         // must have lat/long geometry for insight
                         if (details.result.geometry) {
                             // push only relevent API response information
