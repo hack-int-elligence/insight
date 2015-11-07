@@ -18,6 +18,7 @@ var YALE_API_KEY = 'l7xxd6809c22c97b4f96bb8361a201f71fb3';
 var FACEBOOK_APP_ID = '674671289335201';
 var FACEBOOK_APP_SECRET = 'a7e1c3c097560ba5ae65015405a1f19e';
 
+// Number of results returned from Google Places
 var THRESHOLD = 5;
 
 /*
