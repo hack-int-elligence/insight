@@ -15,7 +15,7 @@ var request = require('request');
 var YALE_API_BASE_URL = 'https://gw.its.yale.edu';
 var YALE_API_KEY = '';
 
-var THRESHOLD = 15;
+var THRESHOLD = 5;
 
 /*
  * Haversine calculation utilities
@@ -30,8 +30,12 @@ var haversineAngle = function(latitude1, longitude1, latitude2, longitude2) {
     var x = Math.cos(toRadians(latitude1)) * Math.sin(toRadians(latitude2)) - Math.sin(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.cos(toRadians(longitude2 - longitude1));
     var brng = Math.atan2(y, x);
     brng = brng * 180 / Math.PI;
+    
     // normalize bearing to give true heading between 0-360
-    brng = (brng < 0) ? brng + 360 : brng;
+    // this calculation is moved to inline in order to preserve
+    // data important for parallax
+    // brng = (brng < 0) ? brng + 360 : brng;
+
     // return a rounded version
     return Math.round(brng);
 };
@@ -168,7 +172,7 @@ router.post('/fb_events', function(req, res) {
                 var event_time = moment(event.start_time);
                 // should be >= current time on the same day
                 if (event_time.isAfter() && event_time.isSame(new Date(), 'day')) {
-                    event.heading = haversineAngle(
+                    var bearing = haversineAngle(
                         // your location
                         Number(req.body.latitude),
                         Number(req.body.longitude),
@@ -176,6 +180,8 @@ router.post('/fb_events', function(req, res) {
                         event.place.location.latitude,
                         event.place.location.longitude
                     );
+                    event.heading = (bearing < 0) ? bearing + 360 : bearing;
+                    event.headingRelative = bearing;
                     event.distance = haversineDistance(
                         // your location
                         Number(req.body.latitude),
@@ -261,7 +267,8 @@ router.post('/insight', function(req, res) {
                                 place_id: details.result.place_id,
                                 address: details.result.formatted_address,
                                 website: details.result.website,
-                                heading: bearing,
+                                heading: (bearing < 0) ? bearing + 360 : bearing,
+                                headingRelative: bearing,
                                 distance: abs_distance
                             });
                             // IMPORTANT: do not modify
