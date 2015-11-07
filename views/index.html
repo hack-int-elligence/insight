@@ -33,12 +33,17 @@
 </head>
 
 <body id="page-top">
-    <div style="margin:auto">
-        <h1>Search via latitude and longitude</h1>
+    <div style="margin:auto; text-align: center; padding:25% 0">
+        <h1 style="padding: 15px 0">Insight Test Page (University of Pennsylvania)</h1>
         <form>
-            <input id="lat" type="text" name="latitude" placeholder="latitude (39.9529720)">39.9529720</input>
-            <input id="long" type="text" name="longitude" placeholder="longitude (-75.2028450)">-75.2028450</input>
+            Latitude:
+            <input id="lat" type="text" name="latitude" placeholder="latitude (39.9529720)"></input>
+            Longitude:
+            <input id="long" type="text" name="longitude" placeholder="longitude (-75.2028450)"></input>
+            <hr />
             <span id="insight" value="search">SEARCH</span>
+            <br />
+            <span id="checkin-test" vale="checkin">CHECK IN</span>
         </form>
     </div>
     <div id="results">
@@ -47,6 +52,8 @@
         </template>
     </div>
     <script type="text/javascript">
+    $('#lat').val(39.9529720);
+    $('#long').val(-175.2028450);
     console.log($('#data-template').html());
     var template = $('#data-template').html();
     Mustache.parse(template);
@@ -54,7 +61,6 @@
          var lat = Number($('#lat').val());
          var lon = Number($('#long').val());
          $('#results').empty();
-         console.log(template);
          $.post('/insight', {
             latitude: lat,
             longitude: lon
@@ -62,6 +68,19 @@
             for (var i = 0; i < data.length; i++) {
                 $('#results').append($(Mustache.render(template, data[i])));
             }
+        }, 'json');
+    });
+
+    $('#checkin-test').on('click', function(e) {
+        var lat = Number($('#lat').val());
+        var lon = Number($('#long').val());
+        var authTokenTest = 'CAAJlnCaKfaEBAABfkmCvxwRoXc1o9bimsZCJk0RTyFlZCYYD6qvf6XKbZCq5zhGSF6j1s0NjSWxZBmdQIinUxBc7w1GfCgBlzRguaadz6YNiSo0mMyTkpZCKXrZCqPSpb5asnR1R5mIDNE5mZC3Oj7VPaHUibJRkgTSNbSTlWkcpxwCIExee9r8Nq9M51bCq1ZA1D6JqXnh6E0CcSwjpbrDBfTvIXqmTxHsnInwLuZAFzIEGSvqqVVIssPLYVQkyezEcZD';
+        $.post('/fb_checkin', {
+            latitude: lat,
+            longitude: lon,
+            authToken: authTokenTest
+        }, function(data) {
+            console.log(data);
         }, 'json');
     });
     </script>

@@ -13,8 +13,13 @@ var hat = require('hat');
 var request = require('request');
 
 var YALE_API_BASE_URL = 'https://gw.its.yale.edu';
-var YALE_API_KEY = 'l7xx9ebbe4eb200e44679ab221819d1c2b3f';
 
+var YALE_API_KEY = 'l7xx9ebbe4eb200e44679ab221819d1c2b3f';
+// TEST URL: https://gw.its.yale.edu/soa-gateway/buildings/feed?type=json?apikey=l7xxd6809c22c97b4f96bb8361a201f71fb3
+var FACEBOOK_APP_ID = '674671289335201';
+var FACEBOOK_APP_SECRET = 'a7e1c3c097560ba5ae65015405a1f19e';
+
+// Number of results returned from Google Places
 var THRESHOLD = 10;
 
 /*
@@ -118,35 +123,50 @@ router.get('/', function(req, res) {
 router.post('/fb_checkin', function(req, res) {
     var FB = require('fb');
     FB.setAccessToken(req.body.authToken);
-    // first find the closest page location using FQL radius search of 50m
-    FB.api('fql', {
-        q: 'SELECT page_id,name,latitude,longitude FROM place WHERE distance(latitude, longitude, ' + req.body.latitude + ', ' + req.body.longitude + ') < 50'
-    }, function(response) {
-        if (!response || res.error) {
-            console.log(!res ? 'error occurred' : res.error);
-            res.send(res.error);
-        } else {
-            // check to see the place even exists
-            if (response.data && response.data.length > 0) {
-                // use the first place returned
-                var place_details = response.data[0];
-                console.log(placeDetails);
-                var place_id = '';
-                // currently set to private for testing
-                FB.api('me/feed', 'post', {
-                    body: 'I just checked in here!',
-                    place: place_id,
-                    privacy: {
-                        value: 'SELF'
-                    }
-                }, function(checkinResponse) {
-                    res.status(200).send(checkinResponse);
-                });
+    var deprecatedFQLQuery = 'SELECT page_id,name,latitude,longitude FROM place WHERE distance(latitude, longitude, ' + req.body.latitude + ', ' + req.body.longitude + ') < 50';
+    // generate app access token for search through Pages on the Graph API
+    request('https://graph.facebook.com/oauth/access_token?client_id=' + FACEBOOK_APP_ID + '&client_secret=' + FACEBOOK_APP_SECRET + '&grant_type=client_credentials', function(e,r,b) {
+        var app_access_token = b.split('=')[1];
+        // use generated token
+        FB.setAccessToken(app_access_token);
+        // run a Pages query search by name and proximity to location (radius based)
+        FB.api('/search', {
+            q: req.body.name,
+            type: 'page',
+            center: req.body.latitude + ',' + req.body.longitude,
+            distance: '50'
+        }, function(response) {
+            if (!response || response.error) {
+                console.log(!response ? 'error occurred' : response.error);
+                res.send(response.error);
             } else {
-                // if no page found, send back error
-                res.status(500).send('No location found for those coordinates. Check-in failed.')
+                // check to see the place even exists
+                if (response.data && response.data.length > 0) {
+                    // use the first place returned
+                    var place_details = response.data[0];
+                    console.log(place_details);
+                    var place_id = place_details.id;
+                    // revert back to client access token for proper scope permissions
+                    FB.setAccessToken(req.body.authToken);
+                    // POST a new check in that's private on the timeline
+                    FB.api('me/feed', 'post', {
+                        body: 'I just checked in at ' + place_details.name,
+                        place: place_id,
+                        privacy: {
+                            value: 'SELF'
+                        }
+                    }, function(checkinResponse) {
+                        // log out the genereated post ID for reference
+                        console.log(checkinResponse);
+                        // send back data to the phone, just because I have no use for it and we might as well keep it somewhere
+                        res.status(200).send(checkinResponse);
+                    });
+                } else {
+                    // if no page found, send back error
+                    res.status(500).send('No location found for those coordinates. Check-in failed.')
+                }
             }
-        }
+        });
     });
 });
 
