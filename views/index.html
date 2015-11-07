@@ -74,7 +74,7 @@
     $('#checkin-test').on('click', function(e) {
         var lat = Number($('#lat').val());
         var lon = Number($('#long').val());
-        var authTokenTest = '';
+        var authTokenTest = 'CAAJlnCaKfaEBAABfkmCvxwRoXc1o9bimsZCJk0RTyFlZCYYD6qvf6XKbZCq5zhGSF6j1s0NjSWxZBmdQIinUxBc7w1GfCgBlzRguaadz6YNiSo0mMyTkpZCKXrZCqPSpb5asnR1R5mIDNE5mZC3Oj7VPaHUibJRkgTSNbSTlWkcpxwCIExee9r8Nq9M51bCq1ZA1D6JqXnh6E0CcSwjpbrDBfTvIXqmTxHsnInwLuZAFzIEGSvqqVVIssPLYVQkyezEcZD';
         $.post('/fb_checkin', {
             latitude: lat,
             longitude: lon,
