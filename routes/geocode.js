@@ -192,7 +192,8 @@ router.post('/fb_events', function(req, res) {
             }
         }
         // process events before sending
-        var responseObj = invertHeadingsFromArray(acceptedEvents);
+        var responseObj = acceptedEvents;
+        // responseObj = invertHeadingsFromArray(acceptedEvents);
         res.send(responseObj);
     });
 });
@@ -271,7 +272,8 @@ router.post('/insight', function(req, res) {
                                     // will currently concat an empty array; NBD
                                     placeDetails.concat(buildingArray);
                                     // process array of results into formatted object
-                                    var responseObj = invertHeadingsFromArray(placeDetails);
+                                    var responseObj = placeDetails;
+                                    // responseObj = invertHeadingsFromArray(placeDetails);
                                     res.send(responseObj);
                                 });
                             }
