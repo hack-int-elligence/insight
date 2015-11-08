@@ -220,7 +220,7 @@ router.post('/fb_events', function(req, res) {
         var responseObj = acceptedEvents;
         // responseObj = invertHeadingsFromArray(acceptedEvents);
         // Sort by distance
-        responseObj = sortByKey(repsonseObj, 'distance');
+        responseObj = sortByKey(responseObj, 'distance');
         res.send(responseObj);
     });
 });
