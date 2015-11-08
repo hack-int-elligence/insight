@@ -120,6 +120,10 @@ router.get('/', function(req, res) {
     res.render('index');
 });
 
+router.get('/test', function (req, res) {
+    res.render('test');
+});
+
 router.post('/fb_checkin', function(req, res) {
     var FB = require('fb');
     FB.setAccessToken(req.body.authToken);
