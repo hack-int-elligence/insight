@@ -236,6 +236,7 @@ header .header-content .header-content-inner p {
         margin-left: auto;
         max-width: 80%;
         font-size: 18px;
+        color: rgba(255,255,255,1);
     }
 }
 
